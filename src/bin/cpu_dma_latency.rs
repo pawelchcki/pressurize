@@ -17,6 +17,7 @@ fn write_and_keep_latency(latency: u32, running: Arc<AtomicBool>) -> anyhow::Res
         thread::sleep(time::Duration::from_secs(1));
     }
 
+    // ensures the file is not dropped before loop exits
     drop(file);
     Ok(())
 }
