@@ -1,0 +1,26 @@
+[package]
+name = "pressurize"
+version = "0.1.0"
+authors = ["Paweł Chojnacki <pawel.chcki@gmail.com>"]
+edition = "2018"
+default-run = "main"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+nightly = []
+
+[dependencies]
+measureme = "9.1"
+log = "0.4"
+perf-event-open-sys = "1.0"
+memmap = "0.7"
+anyhow = "1.0"
+ctrlc = "3.1"
+
+[[bin]]
+name = "main"
+test = false
+bench = false
+path = "src/main.rs"
+required-features = ["nightly"]
