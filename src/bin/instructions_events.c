@@ -20,7 +20,7 @@ static inline __attribute__((always_inline)) void get_key(struct key_t* key) {
     bpf_get_current_comm(&(key->name), sizeof(key->name));
 }
 
-int on_cache_miss(struct bpf_perf_event_data *ctx) {
+int on_instructions(struct bpf_perf_event_data *ctx) {
     struct key_t key = {};
 
     get_key(&key);
@@ -35,15 +35,5 @@ int on_cache_miss(struct bpf_perf_event_data *ctx) {
     miss_count.update(&key, &val.counter);
     
     // miss_count.increment(key, val.counter);
-    return 0;
-}
-
-int on_cache_ref(struct bpf_perf_event_data *ctx) {
-    struct key_t key = {};
-    get_key(&key);
-    if (key.pid == 0){
-        return 0;
-    }
-    ref_count.increment(key, ctx->sample_period);
     return 0;
 }

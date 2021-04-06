@@ -69,22 +69,15 @@ fn do_main(runnable: Arc<AtomicBool>) -> Result<(), BccError> {
         .map(|v| v.parse().expect("Invalid duration"))
         .unwrap_or(DEFAULT_DURATION);
 
-    let code = include_str!("llcstat.c").to_string();
+    let code = include_str!("instructions_events.c").to_string();
     let mut bpf = BPF::new(&code)?;
     PerfEvent::new()
-        .handler("on_cache_miss")
+        .handler("on_instructions")
         .event(Event::Hardware(HardwareEvent::Instructions))
-        .sample_period(Some(sample_period))
-        .attach(&mut bpf)?;
-    PerfEvent::new()
-        .handler("on_cache_ref")
-        .event(Event::Hardware(HardwareEvent::CacheReferences))
         .sample_period(Some(sample_period))
         .attach(&mut bpf)?;
 
     println!("Running for {} seconds", duration);
-
-    let mut elapsed = 0;
 
     let default_options = Options::default();
     let client = Client::new(default_options).unwrap();
