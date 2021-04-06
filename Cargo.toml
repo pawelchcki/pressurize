@@ -17,6 +17,9 @@ perf-event-open-sys = "1.0"
 memmap = "0.7"
 anyhow = "1.0"
 ctrlc = "3.1"
+bcc = "0.0.31"
+dogstatsd = "0.6"
+clap = "2.33.3"
 
 [[bin]]
 name = "main"
