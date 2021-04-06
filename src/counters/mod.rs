@@ -145,7 +145,7 @@ impl Counter {
         })
     }
 
-    pub(super) fn describe_as_json(&self) -> String {
+    pub fn describe_as_json(&self) -> String {
         let (name, units) = match self {
             Counter::WallTime(_) => (
                 WallTime::NAME,
@@ -163,7 +163,7 @@ impl Counter {
     }
 
     #[inline]
-    pub(super) fn since_start(&self) -> u64 {
+    pub fn since_start(&self) -> u64 {
         match self {
             Counter::WallTime(counter) => counter.since_start(),
             Counter::Instructions(counter) => counter.since_start(),
