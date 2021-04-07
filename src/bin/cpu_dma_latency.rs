@@ -11,7 +11,7 @@ fn write_and_keep_latency(latency: u32, running: Arc<AtomicBool>) -> anyhow::Res
         .write(true)
         .open("/dev/cpu_dma_latency")?;
 
-    file.write(&latency.to_ne_bytes())?;
+    file.write_all(&latency.to_ne_bytes())?;
 
     while running.load(Ordering::SeqCst) {
         thread::sleep(time::Duration::from_secs(1));

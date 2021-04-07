@@ -16,7 +16,6 @@ use std::{mem, ptr, str, thread, time};
 // Based on https://github.com/iovisor/bcc/blob/master/tools/llcstat.py
 
 const DEFAULT_SAMPLE_PERIOD: u64 = 100; // Events (Aka every 100 events)
-const DEFAULT_DURATION: u64 = 10; // Seconds
 
 #[repr(C)]
 struct key_t {
@@ -25,12 +24,12 @@ struct key_t {
     name: [u8; 16],
 }
 
-impl Into<Key> for key_t {
-    fn into(self) -> Key {
+impl From<key_t> for Key {
+    fn from(key: key_t) -> Self {
         Key {
-            cpu: self.cpu,
-            pid: self.pid,
-            name: str::from_utf8(&self.name).unwrap_or("").to_string(),
+            cpu: key.cpu,
+            pid: key.pid,
+            name: str::from_utf8(&key.name).unwrap_or("").to_string(),
         }
     }
 }
@@ -109,16 +108,13 @@ fn do_main(runnable: Arc<AtomicBool>) -> anyhow::Result<()> {
                 .checked_sub(prev_value.instructions as i64)
                 .unwrap_or(0);
             if diff > 0 {
+                prev_value.accessed = Some(Instant::now());
+
                 client
                     .count("pawel.instructions.v0", diff, &key.as_tags())
                     .unwrap();
                 prev_value.instructions = *value;
-            } else if diff < 0 {
-                println!(
-                    "{:<-8} {:<-8} {:<-16} {:<-6}",
-                    key.pid, key.cpu, key.name, value,
-                );
-            }
+            } 
         }
 
         let now = Instant::now();
@@ -146,10 +142,9 @@ fn to_map(table: &mut bcc::table::Table) -> HashMap<Key, u64> {
 
     map
 }
-
 fn parse_u64(x: Vec<u8>) -> u64 {
     let mut v = [0_u8; 8];
-    for i in 0..8 {
+    for i  in 0..v.len() {
         v[i] = *x.get(i).unwrap_or(&0);
     }
 
