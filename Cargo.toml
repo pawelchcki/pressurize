@@ -3,7 +3,6 @@ name = "pressurize"
 version = "0.0.1"
 authors = ["Paweł Chojnacki <pawel.chcki@gmail.com>"]
 edition = "2018"
-default-run = "main"
 description = "Tools for benchmarking environments"
 license = "MIT OR Apache-2.0"
 
@@ -21,10 +20,3 @@ ctrlc = "3.1"
 bcc = "0.0.31"
 dogstatsd = "0.6"
 clap = "2.33.3"
-
-[[bin]]
-name = "main"
-test = false
-bench = false
-path = "src/main.rs"
-required-features = ["nightly"]

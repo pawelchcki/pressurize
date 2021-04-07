@@ -111,7 +111,7 @@
 
 use std::error::Error;
 use std::time::Instant;
-use log::{error, info};
+
 
 
 // HACK(eddyb) this is semantically `warn!` but uses `error!` because
@@ -369,6 +369,8 @@ mod hw {
             let group_fd = -1;
             attrs.set_exclude_kernel(1);
             attrs.set_exclude_hv(1);
+            attrs.set_inherit(1);
+            // attrs.sample_type
 
             let file = unsafe {
                 let fd =

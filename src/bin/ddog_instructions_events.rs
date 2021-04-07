@@ -1,13 +1,14 @@
 use bcc::perf_event::{Event, HardwareEvent};
-use bcc::BccError;
+
 use bcc::PerfEvent;
 use bcc::BPF;
-use clap::{App, Arg};
+
+use time::{Instant};
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use dogstatsd::{Client, Options};
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::{collections::HashMap, hash::Hash};
 use std::{mem, ptr, str, thread, time};
 
 // Summarize cache reference and cache misses
@@ -34,86 +35,84 @@ impl Into<Key> for key_t {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Debug)]
+impl Key {
+    fn as_tags(&self) -> [String; 3] {
+        [
+            format!("pid:{}", self.pid),
+            format!("name:{}", self.name),
+            format!("cpu:{}", self.cpu),
+        ]
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 struct Key {
     cpu: i32,
     pid: i32,
     name: String,
 }
 
-fn do_main(runnable: Arc<AtomicBool>) -> Result<(), BccError> {
-    let matches = App::new("cpudist")
-        .arg(
-            Arg::with_name("sample_period")
-                .long("sample_period")
-                .short("c")
-                .help("Sample one in this many number of cache reference / miss events")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("duration")
-                .long("duration")
-                .short("d")
-                .help("Duration in seconds to run")
-                .takes_value(true),
-        )
-        .get_matches();
-
-    let sample_period: u64 = matches
-        .value_of("sample_period")
-        .map(|v| v.parse().expect("Invalid sample period"))
-        .unwrap_or(DEFAULT_SAMPLE_PERIOD);
-
-    let duration: u64 = matches
-        .value_of("duration")
-        .map(|v| v.parse().expect("Invalid duration"))
-        .unwrap_or(DEFAULT_DURATION);
-
+fn setup_ebpf() -> anyhow::Result<BPF> {
     let code = include_str!("instructions_events.c").to_string();
     let mut bpf = BPF::new(&code)?;
     PerfEvent::new()
         .handler("on_instructions")
         .event(Event::Hardware(HardwareEvent::Instructions))
-        .sample_period(Some(sample_period))
+        .sample_period(Some(DEFAULT_SAMPLE_PERIOD))
         .attach(&mut bpf)?;
+    Ok(bpf)
+}
 
-    println!("Running for {} seconds", duration);
-
+fn ddog_client() -> anyhow::Result<Client> {
     let default_options = Options::default();
-    let client = Client::new(default_options).unwrap();
+    Ok(Client::new(default_options)?)
+}
 
-    let tags = &["env:production"];
+struct LruValue {
+    instructions: u64,
+    accessed: Option<Instant>,
+}
 
-    // Increment a counter
-    client.incr("my_counter", tags).unwrap();
+impl Default for LruValue {
+    fn default() -> Self {
+        Self {
+            instructions: 0,
+            accessed: None,
+        }
+    }
+}
+
+fn do_main(runnable: Arc<AtomicBool>) -> anyhow::Result<()> {
+    let bpf = setup_ebpf()?;
+    let client = ddog_client()?;
+
+    let mut change: HashMap<Key, LruValue> = HashMap::new();
+    let _start_time = Instant::now();
 
     while runnable.load(Ordering::SeqCst) {
         thread::sleep(time::Duration::new(1, 0));
 
         // Count misses
-        let mut miss_table = bpf.table("miss_count")?;
-        let miss_map = to_map(&mut miss_table);
-        let mut change = HashMap::new();
-        // let x  = Data {cpu: 1, pid: 2, name: "blah".to_string()};
-        // change.insert(Data{.cpu = 1, .pid = 2, .name = "blah"},1 )
+        let mut instruction_count = bpf.table("instruction_count")?;
+        let instruction_map = to_map(&mut instruction_count);
 
-        for (key, value) in miss_map.iter() {
-            if !change.contains_key(key) {
-                change.insert(key, 0u64);
-            }
+        for (key, value) in instruction_map.iter() {
+            let prev_value = match change.get_mut(&key) {
+                Some(val) => val,
+                None => {
+                    change.insert(key.clone(), LruValue::default());
+                    change.get_mut(&key).expect("failed to set LRU storage")
+                }
+            };
 
-            let prev_value = change.get(key).unwrap_or(&0);
-            let diff = value.wrapping_sub(*prev_value) as i64;
+            let diff = (*value as i64)
+                .checked_sub(prev_value.instructions as i64)
+                .unwrap_or(0);
             if diff > 0 {
-                let tags = &[
-                    format!("pid:{}", key.pid),
-                    format!("name:{}", key.name),
-                    format!("cpu:{}", key.cpu),
-                ];
                 client
-                    .count("pawel.instructions.v0", diff, tags)
+                    .count("pawel.instructions.v0", diff, &key.as_tags())
                     .unwrap();
-                change.insert(key, *value);
+                prev_value.instructions = *value;
             } else if diff < 0 {
                 println!(
                     "{:<-8} {:<-8} {:<-16} {:<-6}",
@@ -121,6 +120,16 @@ fn do_main(runnable: Arc<AtomicBool>) -> Result<(), BccError> {
                 );
             }
         }
+
+        let now = Instant::now();
+        change.retain(|_k, v| {
+            let passed = v.accessed.and_then(|accessed| now.checked_duration_since(accessed)); 
+
+            match passed {
+                Some(passed) => { passed.as_secs() < 3600 }
+                None => { false }
+            }
+        });
     }
 
     Ok(())
