@@ -11,6 +11,8 @@ jobs:
         with:
           toolchain: nightly
           override: true
+      - name: Install libraries
+        run: sudo apt-get -y install libbpfcc-dev
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
