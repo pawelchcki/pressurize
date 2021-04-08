@@ -10,7 +10,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Install libraries
         run: sudo apt-get -y install libbpfcc-dev
-      - run: cargo --release --bin ddog_instructions_events
+      - run: cargo +nightly build --release --bin ddog_instructions_events
       - name: Archive code coverage results
         uses: actions/upload-artifact@v2
         with:
