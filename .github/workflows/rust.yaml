@@ -15,12 +15,12 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --release --bin ddog_instructrions_events
+          args: --release --bin ddog_instructions_events
       - name: Archive code coverage results
         uses: actions/upload-artifact@v2
         with:
           name: binary
-          path: target/release/ddog_instructrions_events
+          path: target/release/ddog_instructions_events
       
       # - uses: actions-rs/clippy-check@v1
       #   with:
